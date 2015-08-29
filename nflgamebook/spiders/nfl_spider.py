@@ -23,7 +23,8 @@ class NflScheduleSpider(BaseSpider):
     SEASON_PATTERN = r'year\s+\:\s+(\d{4}),'
     GAMEID_PATTERN = r'id\s+\:\s+\"(\d{10})\",'
     GAMEKEY_PATTERN = r'key\s+\:\s+\"(\d{5})\",'
-    TEAMS_PATTERN = r'teams\s+\:\s+(\{.*\}),'
+    HOME_TEAM_PATTERN = r"id='homeTeam'\s+content='(\w+)'"
+    VISITOR_TEAM_PATTERN = r"id='visitorTeam'\s+content='(\w+)'"
 
     def save_gamebook(self, response):
         """
@@ -59,9 +60,10 @@ class NflScheduleSpider(BaseSpider):
 
         metadata = self._game_metadata(response)
 
-        for gamebook_url in set(re.findall(self.GAMEBOOK_URL_PATTERN, response.body)):
-            url = self.NFL_BASE_URL + gamebook_url
-            yield Request(url, callback=self.save_gamebook, meta=metadata)
+        gamebook_url = '/liveupdate/gamecenter/{}/{}_Gamebook.pdf'.format(metadata.get('gamekey'), metadata.get('team2'))
+
+        url = self.NFL_BASE_URL + gamebook_url
+        yield Request(url, callback=self.save_gamebook, meta=metadata)
 
     def parse(self, response):
         """
@@ -92,11 +94,11 @@ class NflScheduleSpider(BaseSpider):
         seasontype_match = re.search(self.SEASONTYPE_PATTERN, response.body)
         seasontype = seasontype_match.groups()[0] if seasontype_match is not None else 'unknown'
 
-        teams_match = re.search(self.TEAMS_PATTERN, response.body)
-        if teams_match:
-            teams = json.loads(teams_match.groups()[0]).keys()
-        else:
-            teams = ['UNKNOWN', 'UNKNOWN']
+        hometeam_match = re.search(self.HOME_TEAM_PATTERN, response.body)
+        hometeam = hometeam_match.groups()[0] if hometeam_match is not None else 'UNKNOWN'
+
+        visitorteam_match = re.search(self.VISITOR_TEAM_PATTERN, response.body)
+        visitorteam = visitorteam_match.groups()[0] if visitorteam_match is not None else 'UNKNOWN'
 
         return {
             'gameid': gameid,
@@ -104,6 +106,6 @@ class NflScheduleSpider(BaseSpider):
             'week': week,
             'season': season,
             'seasontype': seasontype,
-            'team1': teams[0],
-            'team2': teams[1],
+            'team1': visitorteam,
+            'team2': hometeam
         }
